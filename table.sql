@@ -1,10 +1,10 @@
-create table edge (
+create or replace table edge (
     source UInt64,
     target UInt64,
     weight Float64,
-) ENGINE = MergeTree()
+) ENGINE = ReplacingMergeTree()
 PRIMARY KEY (source, target)
-ORDER BY (source ASC, target ASC);
+ORDER BY (source, target, weight);
 
 create table vertex (
     id UInt64,
@@ -20,7 +20,7 @@ ALTER TABLE vertex (MATERIALIZE INDEX vertex_label_text_idx);
 INSERT INTO edge (source, target, weight)
 VALUES (1, 2, 1.0),
        (1, 3, 2.0),
-       (1, 4, 2.0),
+       (1, 4, 4.0),
        (2, 3, 2.0),
        (2, 3, 2.0),
        (3, 1, 3.0);
@@ -43,3 +43,14 @@ select count(*) from hackernews where length(title) > 3 and length(title) < 40 l
 SELECT * FROM vertex WHERE match(label, '^dh| dh') AND id in (SELECT target FROM edge WHERE source = 1);
 
 EXPLAIN indexes = 1 SELECT * FROM vertex WHERE label like  '%test%';
+
+SELECT v.id, v.label, e.weight
+FROM vertex v
+JOIN (
+    SELECT target, weight
+    FROM edge
+    WHERE source = 1
+    ORDER BY weight DESC
+) e ON v.id = e.target
+WHERE match(v.label, '^dh| dh')
+ORDER BY e.weight DESC;
